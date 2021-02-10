@@ -1,2 +1,3 @@
-# wiz2joplin
-从为知笔记迁移到Joplin
+# Wiznote to Joplin
+
+从为知笔记迁移到 Joplin
