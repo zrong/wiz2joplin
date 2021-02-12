@@ -4,8 +4,9 @@
 ##############################
 
 from os import PathLike
-from typing import Union
+from typing import Union, Optional
 from w2j import logger
+from w2j.parser import parse_wiz_html
 from pathlib import Path
 import sqlite3
 from datetime import datetime, timezone, timedelta
@@ -120,7 +121,7 @@ class WizDocument(object):
     body: str = None
 
     # markdown，默认为 markdown
-    markdown: bool = True
+    is_markdown: bool = True
 
     # 文档的标签
     tags: list[WizTag] = []
@@ -139,8 +140,8 @@ class WizDocument(object):
         self.modified = tots(modified)
         self.attachment_count = attachment_count
 
-        self.markdown = title.endswith('.md')
-        if self.markdown and len(title) > 3:
+        self.is_markdown = title.endswith('.md')
+        if self.is_markdown and len(title) > 3:
             self.title = title[:-3]
         else:
             self.title = title
@@ -168,11 +169,9 @@ class WizDocument(object):
     def resolve_tags(self, tags: list[WizTag]) -> None:
         self.tags = tags
 
-    def resolve_body(self, work_dir: PathLike) -> None:
-        """ 解压文档压缩包，解析文档正文中的图像文件，将其转换为 WizImage
-        将正文存入 body
+    def _extract_zip(self, work_dir: PathLike) -> None:
+        """ 解压缩当前文档的 zip 文件到 work_dir，以 guid 为子文件夹名称
         """
-        self.check_note_file()
         self.note_extract_dir = Path(work_dir.name).joinpath(self.guid)
         # 如果目标文件夹已经存在，就不解压了
         if self.note_extract_dir.exists():
@@ -182,11 +181,37 @@ class WizDocument(object):
             zip_file = ZipFile(self.note_file)
             zip_file.extractall(self.note_extract_dir)
         except BadZipFile as e:
-            logger.info(f'ZIP 文件错误，可能是需要密码。 {self.note_file!s} |{self.title}|')
-        
+            msg = f'ZIP 文件错误，可能是需要密码。 {self.note_file!s} |{self.title}|'
+            raise BadZipFile(msg)
+            # logger.info(msg)
+
+    def _read_html(self) -> None:
+        if self.note_extract_dir is None:
+            raise FileNotFoundError(f'请先解压缩文档 {self.note_file!s} |{self.title}|')
+        index_html = self.note_extract_dir.joinpath('index.html')
+        if not index_html.is_file:
+            raise FileNotFoundError(f'主文档文件不存在！ {index_html!s} |{self.title}|')
+        return parse_wiz_html(index_html)
+
+    def _parse_html(self) -> None:
+        """ 解析 index.html 文件
+        """
+        html_body = self._read_html()
+
+    def resolve_body(self, work_dir: PathLike) -> None:
+        """ 解压文档压缩包，解析文档正文中的图像文件，将其转换为 WizImage
+        将正文存入 body
+        """
+        self.check_note_file()
+        self._extract_zip(work_dir)
+
+    def resolve(self, attachments: list[WizAttachment], tags: list[WizTag], work_dir: PathLike) -> None:
+        self.resolve_attachments(attachments)
+        self.resolve_tags(tags)
+        self.resolve_body(work_dir)
 
     def __repr__(self):
-        return f'<w2j.wiz.WizDocument {self.data_dir.resolve()}>'
+        return f'<w2j.wiz.WizDocument {self.note_file.resolve()} |{self.title}| tags: {len(self.tags)} attachments: {len(self.attachments)} markdown: {self.is_markdown}>'
 
 
 class DataDir(object):
@@ -210,6 +235,41 @@ class DataDir(object):
         self.wizthumb_db = self.data_dir.joinpath('wizthumb.db')
         if not self.wizthumb_db.exists():
             raise FileNotFoundError(f'找不到数据库 {self.wizthumb_db.resolve()}！')
+
+    def _get_one_document(self, guid: str) -> tuple[Optional[tuple], list, list]:
+        conn = sqlite3.connect(self.index_db)
+        cur = conn.cursor()
+
+        sql = '''SELECT
+        DOCUMENT_GUID, DOCUMENT_TITLE, DOCUMENT_LOCATION, DOCUMENT_URL, DT_CREATED, DT_MODIFIED, DOCUMENT_ATTACHEMENT_COUNT
+        FROM WIZ_DOCUMENT
+        WHERE DOCUMENT_GUID = ?
+        '''
+        cur.execute(sql, (guid, ))
+        document_row = cur.fetchone()
+        attachment_rows  = []
+        tag_rows = []
+
+        if document_row:
+            sql = '''SELECT
+            ATTACHMENT_GUID, DOCUMENT_GUID, ATTACHMENT_NAME, DT_INFO_MODIFIED
+            FROM WIZ_DOCUMENT_ATTACHMENT
+            WHERE DOCUMENT_GUID = ?
+            '''
+            cur.execute(sql, (guid, ))
+            attachment_rows = cur.fetchall()
+
+            sql = '''SELECT
+            WIZ_TAG.TAG_GUID, WIZ_TAG.TAG_NAME, WIZ_TAG.DT_MODIFIED
+            FROM WIZ_DOCUMENT_TAG INNER JOIN WIZ_TAG
+            ON WIZ_DOCUMENT_TAG.TAG_GUID = WIZ_TAG.TAG_GUID
+            WHERE WIZ_DOCUMENT_TAG.DOCUMENT_GUID = ?
+            '''
+            cur.execute(sql, (guid, ))
+            tag_rows = cur.fetchall()
+
+        conn.close()
+        return document_row, attachment_rows, tag_rows
 
     def _get_all_document(self):
         """ 获取 WIZ_DUCUMENT 的所有记录
@@ -385,15 +445,33 @@ class WizStorage(object):
         documents: list[WizDocument] = []
         for row in rows:
             document = WizDocument(*row, self.data_dir.notes_dir, check_file=True)
-            document.resolve_attachments(self.attachments_in_document.get(document.guid, []))
-            document.resolve_tags(self.tags_in_document.get(document.guid, []))
-            document.resolve_body(self.work_dir)
+            document.resolve(
+                self.attachments_in_document.get(document.guid, []),
+                self.tags_in_document.get(document.guid, []),
+                self.work_dir
+            )
             documents.append(document)
         return documents
 
-    def resolve(self) -> None:
-        pass
+    def build_document(self, guid: str) -> WizDocument:
+        """ 构建一个 document
+        """
+        document_row, attachment_rows, tag_rows = self.data_dir._get_one_document(guid)
+        if not document_row:
+            raise ValueError(f'找不到文档 {guid}！')
 
+        attachments: list[WizAttachment] = []
+        for row in attachment_rows:
+            attachments.append(WizAttachment(*row, self.data_dir.attachments_dir, check_file=False))
+        
+        tags: list[WizTag] = []
+        for row in tag_rows:
+            tags.append(WizTag(*row))
+
+        document = WizDocument(*document_row, self.data_dir.notes_dir, check_file=True)
+        document.resolve(attachments, tags, self.work_dir)
+        return document
+        
     def clear(self) -> None:
         """ 删除工作文件夹
         """
