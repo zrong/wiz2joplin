@@ -5,20 +5,65 @@
 
 from os import PathLike
 from typing import Union, Optional
-from w2j import logger
-from w2j.parser import parse_wiz_html
 from pathlib import Path
 import sqlite3
-from datetime import datetime, timezone, timedelta
 from zipfile import ZipFile, BadZipFile
 from tempfile import TemporaryDirectory
 
+from w2j import logger
+from w2j.parser import parse_wiz_html, parse_wiz_image, tots
 
 
-def tots(dt: str):
-    """ 转换本地时间到时间戳，数据库中记录的是东八区本地时间
+class WizInternalLink(object):
+    """ 嵌入 html 正文中的为知笔记内部链接，可能是笔记，也可能是附件
     """
-    return int(datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone(timedelta(hours=8))).timestamp()*1000)
+    # 原始链接的整个 HTML 内容，包括 <a href="link....">名称</a>
+    outerhtml: str = None
+
+    # 链接的 title
+    title: str = None
+
+    # 原始链接中的资源 guid，可能是 attachemnt 或者是 document
+    guid: str = None
+
+    # 值为 open_attachment 或者 open_document
+    type_: str = 'open_attachment'
+
+    def __init__(self, outerhtml: str, guid: str, title: str, type_: str) -> None:
+        self.outerhtml = outerhtml
+        self.guid = guid
+        self.title = title
+        self.type_ = type_
+
+    def __repr__(self) -> str:
+        return f'<WizInternalLink {self.type_}, {self.title}, {self.guid}>'
+
+
+class WizImage(object):
+    """ 在为知笔记文章中包含的本地图像
+
+    在为知笔记中，本地图像不属于资源，也没有自己的 guid
+    """
+    # 原始图像的整个 HTML 内容，包括 <img src="index_files/name.jpg">
+    outerhtml: str = None
+
+    # 仅包含图像的 src 部分
+    src: str = None
+
+    # 图像文件的 Path 对象，在硬盘上的路径
+    file: Path = None
+
+    def __init__(self, outerhtml: str, src: str, note_extract_dir: Path) -> None:
+        self.outerhtml = outerhtml
+        self.src = src
+        self.file = note_extract_dir.joinpath(src)
+
+        if not self.file.exists():
+            raise FileNotFoundError(f'找不到文件 {self.file}！')
+
+    def __repr__(self) -> str:
+        return f'<WizImage {self.src}, {self.outerhtml}>'
+
 
 class WizAttachment(object):
     """ 为知笔记附件
@@ -83,15 +128,6 @@ class WizTag(object):
         return f'<WizTag {self.guid}, {self.name}, {self.modified}>'
 
 
-class WizImage(object):
-    """ 在为知笔记文章中包含的本地图像
-
-    在为知笔记中，本地图像不属于资源，也没有自己的 guid
-    """
-    # 解压后的相对 index.html 的路径
-    url: str = None
-
-
 class WizDocument(object):
     """ 为知笔记文档
     """
@@ -131,6 +167,9 @@ class WizDocument(object):
 
     # 包含在为知笔记文档中的图像文件，需要在文档正文中使用正则提取
     images: list[WizImage] = []
+
+    # 包含在为知笔记文档中的内部链接，需要在文档征文中使用正则提取
+    internal_links: list[WizInternalLink] = []
 
     def __init__(self, guid: str, title: str, location: str, url: str, created: str, modified: str, attachment_count: int, notes_dir: Path, check_file: bool = False) -> None:
         self.guid = guid
@@ -175,7 +214,7 @@ class WizDocument(object):
         self.note_extract_dir = Path(work_dir.name).joinpath(self.guid)
         # 如果目标文件夹已经存在，就不解压了
         if self.note_extract_dir.exists():
-            logger.info(f'{self.note_extract_dir!s} |{self.title}| 已经存在，跳过。')
+            # logger.info(f'{self.note_extract_dir!s} |{self.title}| 已经存在，跳过。')
             return
         try:
             zip_file = ZipFile(self.note_file)
@@ -185,18 +224,41 @@ class WizDocument(object):
             raise BadZipFile(msg)
             # logger.info(msg)
 
-    def _read_html(self) -> None:
+    def _parse_html(self) -> None:
+        """ 解析 index.html 文件
+        """
         if self.note_extract_dir is None:
             raise FileNotFoundError(f'请先解压缩文档 {self.note_file!s} |{self.title}|')
         index_html = self.note_extract_dir.joinpath('index.html')
         if not index_html.is_file:
             raise FileNotFoundError(f'主文档文件不存在！ {index_html!s} |{self.title}|')
-        return parse_wiz_html(index_html)
 
-    def _parse_html(self) -> None:
-        """ 解析 index.html 文件
-        """
-        html_body = self._read_html()
+        html_body, open_attachments, open_documents = parse_wiz_html(index_html, self.title)
+        self.body = html_body
+        self.internal_links = []
+
+        for open_attachement in open_attachments:
+            link = WizInternalLink(
+                open_attachement.group(0),
+                open_attachement.group(2),
+                open_attachement.group(3),
+                open_attachement.group(1))
+            self.internal_links.append(link)
+        for open_document in open_documents:
+            link = WizInternalLink(
+                open_document.group(0),
+                open_document.group(2),
+                open_document.group(4),
+                open_document.group(1))
+            self.internal_links.append(link)
+
+        self.images = []
+        for image in parse_wiz_image(html_body):
+            img = WizImage(image.group(0), image.group(1), self.note_extract_dir)
+            self.images.append(img)
+
+        print(self.internal_links)
+        print(self.images)
 
     def resolve_body(self, work_dir: PathLike) -> None:
         """ 解压文档压缩包，解析文档正文中的图像文件，将其转换为 WizImage
@@ -204,6 +266,7 @@ class WizDocument(object):
         """
         self.check_note_file()
         self._extract_zip(work_dir)
+        self._parse_html()
 
     def resolve(self, attachments: list[WizAttachment], tags: list[WizTag], work_dir: PathLike) -> None:
         self.resolve_attachments(attachments)

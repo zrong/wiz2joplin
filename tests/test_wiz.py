@@ -31,20 +31,28 @@ def test_build_documents(ws: WizStorage):
     """
     documents = ws.build_documents()
     document_rows = ws.data_dir._get_all_document()
-    assert len(document_rows) == len(document_rows)
+    assert len(documents) == len(document_rows)
 
 
+# @pytest.mark.skip
 def test_build_document(ws: WizStorage):
     """ 测试获取一个文档
     """
     # 没有 attachment，有一个 tag
-    # '49c21d80-dc3f-47d6-b37b-7b5602133600'
+    one_tag = '49c21d80-dc3f-47d6-b37b-7b5602133600'
 
-    # Flash向量-8-球和角
-    # 44fba993-8f62-4eef-a7db-5f8b332d95d3
+    # Flash向量-8-球和角，有一个 attachment
+    two_open_attachment = '44fba993-8f62-4eef-a7db-5f8b332d95d3'
 
     # 2021-02-1weeks.md
-    # 32321691-f842-4cf2-8a1a-e9f3f1212a42
+    four_open_document = '32321691-f842-4cf2-8a1a-e9f3f1212a42'
 
-    document = ws.build_document('32321691-f842-4cf2-8a1a-e9f3f1212a42')
+    # linux 技巧：使用 screen 管理你的远程会话
+    more_images = 'f38c347c-17cb-4342-a063-861876f70660'
+
+    # 超过 10 个图像
+    more_images2 = 'cc18a030-7445-43ad-939a-ad9e264da8d7'
+    document = ws.build_document(more_images)
+
+    # document = ws.build_document(four_open_document)
     assert document.title == 'Flash向量-8-球和角'
