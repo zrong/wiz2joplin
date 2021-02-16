@@ -34,7 +34,7 @@ def test_build_documents(ws: WizStorage):
     assert len(documents) == len(document_rows)
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_build_document(ws: WizStorage):
     """ 测试获取一个文档
     """

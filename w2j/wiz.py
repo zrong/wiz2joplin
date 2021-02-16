@@ -4,7 +4,7 @@
 ##############################
 
 from os import PathLike
-from typing import Union, Optional
+from typing import Any, Union, Optional
 from pathlib import Path
 import sqlite3
 from zipfile import ZipFile, BadZipFile
@@ -138,10 +138,13 @@ class WizDocument(object):
     # 文件夹，为知笔记的文件夹就是一个用 / 分隔的字符串
     location: str = None
 
-    # 如果文档是采集的，则这个地址为文档的采集url
-    url: str = None
+    # 保存一个 Folder 对象，这个对象在 Adapter 进行 Location 到 Folder 的转换之后才会填充
+    folder: Any = None
+    
+    url: str = None # 如果文档是采集的，则这个地址为文档的采集url
 
     created: int = 0
+
     modified: int = 0
 
     # 从数据库中读取的附件数量，如果大于 0 说明这个文档有附件
@@ -534,6 +537,12 @@ class WizStorage(object):
         document = WizDocument(*document_row, self.data_dir.notes_dir, check_file=True)
         document.resolve(attachments, tags, self.work_dir)
         return document
+
+    def resolve(self) -> None:
+        """ 解析所有文档并保存相关数据
+        调用此方法后，所有数据安全并可用
+        """
+        self.documents = self.build_documents()
         
     def clear(self) -> None:
         """ 删除工作文件夹

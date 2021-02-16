@@ -1,6 +1,6 @@
 ##############################
 # w2j.parser
-# 解析为知笔记的 html 源文件
+# 解析器，解析 html 源码
 ##############################
 
 from datetime import datetime, timezone, timedelta
@@ -56,3 +56,20 @@ def tots(dt: str):
     """ 转换本地时间到时间戳，数据库中记录的是东八区本地时间
     """
     return int(datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone(timedelta(hours=8))).timestamp()*1000)
+
+
+def towizid(id: str) -> str:
+    """ 从 joplin 的 id 格式转为 wiz 的 guid 格式
+    """
+    one = id[:8]
+    two = id[8:12]
+    three = id[12:16]
+    four = id[16:20]
+    five = id[20:]
+    return '-'.join([one, two, three, four, five])
+
+
+def tojoplinid(guid: str) -> str:
+    """ 从 wiz 的 guid 格式转为 joplin 的 id 格式
+    """
+    return ''.join(guid.split('-'))
