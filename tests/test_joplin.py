@@ -11,6 +11,7 @@ def test_get_folders(jda: JoplinDataAPI):
     folders, has_more, next_page = jda.get_folders(limit=1, page=0)
     assert has_more == False
 
+@pytest.mark.skip
 def test_get_folder(jda: JoplinDataAPI):
     # 临时记录 Folder
     # test_id = 'f02beb3e93f4456ea4032613b9a9575d'
@@ -19,6 +20,7 @@ def test_get_folder(jda: JoplinDataAPI):
     assert folder.id == test_id
 
     
+@pytest.mark.skip
 def test_post_folders(jda: JoplinDataAPI):
     folder = jda.post_folders(title='创新新的folder')
     print(folder)

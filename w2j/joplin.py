@@ -221,7 +221,7 @@ class JoplinDataAPI(object):
         resp = self.client.get('/folders/{guid}/notes', params=query)
         return JoplinNote(**resp.json())
 
-    def post_folders(self, **kwargs) -> JoplinFolder:
+    def post_folder(self, **kwargs) -> JoplinFolder:
         """ 创建一个新的 folder
         """
         query = self._build_query()
@@ -230,9 +230,3 @@ class JoplinDataAPI(object):
         if data.get('error'):
             raise ValueError(data['error'])
         return JoplinFolder(**data)
-
-    def post_folder(self, *folders: JoplinFolder) -> list[JoplinFolder]:
-        """ 根据 guid 列表获取 folder
-        """
-        pass
-

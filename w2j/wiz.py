@@ -8,9 +8,8 @@ from typing import Any, Union, Optional
 from pathlib import Path
 import sqlite3
 from zipfile import ZipFile, BadZipFile
-from tempfile import TemporaryDirectory
 
-from w2j import logger
+from w2j import logger, work_dir as default_work_dir
 from w2j.parser import parse_wiz_html, parse_wiz_image, tots
 
 
@@ -156,6 +155,9 @@ class WizDocument(object):
     # 文档压缩包解压到的路径
     note_extract_dir: Path = None
 
+    # 文档解压到的主文件夹
+    documents_dir: Path
+
     # 文档正文
     body: str = None
 
@@ -174,13 +176,15 @@ class WizDocument(object):
     # 包含在为知笔记文档中的内部链接，需要在文档征文中使用正则提取
     internal_links: list[WizInternalLink] = []
 
-    def __init__(self, guid: str, title: str, location: str, url: str, created: str, modified: str, attachment_count: int, notes_dir: Path, check_file: bool = False) -> None:
+    def __init__(self, guid: str, title: str, location: str, url: str, created: str, modified: str, attachment_count: int, notes_dir: Path, documents_dir: Path, check_file: bool = False) -> None:
         self.guid = guid
         self.location = location
         self.url = url
         self.created = tots(created)
         self.modified = tots(modified)
         self.attachment_count = attachment_count
+
+        self.documents_dir = documents_dir
 
         self.is_markdown = title.endswith('.md')
         if self.is_markdown and len(title) > 3:
@@ -211,10 +215,10 @@ class WizDocument(object):
     def resolve_tags(self, tags: list[WizTag]) -> None:
         self.tags = tags
 
-    def _extract_zip(self, work_dir: PathLike) -> None:
+    def _extract_zip(self) -> None:
         """ 解压缩当前文档的 zip 文件到 work_dir，以 guid 为子文件夹名称
         """
-        self.note_extract_dir = Path(work_dir.name).joinpath(self.guid)
+        self.note_extract_dir = self.documents_dir.joinpath(self.guid)
         # 如果目标文件夹已经存在，就不解压了
         if self.note_extract_dir.exists():
             # logger.info(f'{self.note_extract_dir!s} |{self.title}| 已经存在，跳过。')
@@ -260,21 +264,18 @@ class WizDocument(object):
             img = WizImage(image.group(0), image.group(1), self.note_extract_dir)
             self.images.append(img)
 
-        print(self.internal_links)
-        print(self.images)
-
-    def resolve_body(self, work_dir: PathLike) -> None:
+    def resolve_body(self) -> None:
         """ 解压文档压缩包，解析文档正文中的图像文件，将其转换为 WizImage
         将正文存入 body
         """
         self.check_note_file()
-        self._extract_zip(work_dir)
+        self._extract_zip()
         self._parse_html()
 
-    def resolve(self, attachments: list[WizAttachment], tags: list[WizTag], work_dir: PathLike) -> None:
+    def resolve(self, attachments: list[WizAttachment], tags: list[WizTag]) -> None:
         self.resolve_attachments(attachments)
         self.resolve_tags(tags)
-        self.resolve_body(work_dir)
+        self.resolve_body()
 
     def __repr__(self):
         return f'<w2j.wiz.WizDocument {self.note_file.resolve()} |{self.title}| tags: {len(self.tags)} attachments: {len(self.attachments)} markdown: {self.is_markdown}>'
@@ -385,17 +386,20 @@ class WizStorage(object):
     """ 保存所有位置笔记的数据
     """
     # 工作文件夹所在地址，临时文件会置于工作文件夹中
-    work_dir: Union[Path, TemporaryDirectory] = None
+    work_dir: Path
 
-    wiznote_dir: Path = None
-    user_id: str = None
-    user_dir: Path = None
-    group_dir: Path = None
+    # 为知笔记文档解压到这个文件夹
+    documents_dir: Path
+
+    wiznote_dir: Path
+    user_id: str
+    user_dir: Path
+    group_dir: Path
 
     # 是否为 group 仓库
     is_group_storage: bool = False
 
-    data_dir: DataDir = None
+    data_dir: DataDir
 
     # 所有的 TAG
     tags: list[WizTag] = []
@@ -421,7 +425,13 @@ class WizStorage(object):
         :param winznote_dir: 帐号所在文件夹
         :param work_dir: 工作文件夹，用于解压文件等操作，若不提供则使用临时文件夹
         """
-        self.work_dir = work_dir or TemporaryDirectory()
+        self.work_dir = work_dir or default_work_dir
+
+        # 创建专门解压缩位置文档的文件夹
+        self.documents_dir = self.work_dir.joinpath('documents')
+        if not self.documents_dir.exists():
+            self.documents_dir.mkdir(parents=True)
+
         self.wiznote_dir = wiznote_dir
         self.user_id = user_id
         self.user_dir = self.wiznote_dir.joinpath(user_id)
@@ -510,11 +520,10 @@ class WizStorage(object):
 
         documents: list[WizDocument] = []
         for row in rows:
-            document = WizDocument(*row, self.data_dir.notes_dir, check_file=True)
+            document = WizDocument(*row, self.data_dir.notes_dir, self.documents_dir, check_file=True)
             document.resolve(
                 self.attachments_in_document.get(document.guid, []),
-                self.tags_in_document.get(document.guid, []),
-                self.work_dir
+                self.tags_in_document.get(document.guid, [])
             )
             documents.append(document)
         return documents
@@ -545,10 +554,7 @@ class WizStorage(object):
         self.documents = self.build_documents()
         
     def clear(self) -> None:
-        """ 删除工作文件夹
+        """ 删除解压的临时文件夹
         """
-        if isinstance(self.work_dir, TemporaryDirectory):
-            self.work_dir.cleanup()
-        else:
-            self.work_dir.unlink()
+        self.documents_dir.unlink()
 

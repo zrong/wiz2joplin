@@ -1,8 +1,10 @@
-from w2j.joplin import JoplinDataAPI
-from w2j import wiz
 from pathlib import Path
 from os import environ
+
 import pytest
+
+from w2j import wiz, joplin
+from w2j.adapter import Adapter
 
 
 @pytest.fixture(scope='session')
@@ -27,4 +29,9 @@ def wiz_user_id():
 
 @pytest.fixture(scope='session')
 def jda():
-    return JoplinDataAPI()
+    return joplin.JoplinDataAPI()
+
+
+@pytest.fixture(scope='session')
+def adapter(ws: wiz.WizStorage, jda: joplin.JoplinDataAPI, work_dir: Path):
+    return Adapter(ws, jda, work_dir)
