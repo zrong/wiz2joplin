@@ -1,3 +1,5 @@
+from os import name
+from pathlib import Path
 from w2j.joplin import JoplinDataAPI
 import pytest
 

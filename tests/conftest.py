@@ -29,7 +29,9 @@ def wiz_user_id():
 
 @pytest.fixture(scope='session')
 def jda():
-    return joplin.JoplinDataAPI()
+    return joplin.JoplinDataAPI(
+        token='90284420dc2db743d6ac1b803346c7330fdbf5d1f6a26a10f42dee448a7d35895b470bcffcb0061d90a742e513a33d7dd6b858c7ebfc89538fab0e69e682aa21'
+    )
 
 
 @pytest.fixture(scope='session')

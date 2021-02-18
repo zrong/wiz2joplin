@@ -4,64 +4,13 @@
 ##############################
 
 from os import PathLike
-from typing import Any, Union, Optional
+from typing import Any, Optional
 from pathlib import Path
 import sqlite3
 from zipfile import ZipFile, BadZipFile
 
 from w2j import logger, work_dir as default_work_dir
-from w2j.parser import parse_wiz_html, parse_wiz_image, tots
-
-
-class WizInternalLink(object):
-    """ 嵌入 html 正文中的为知笔记内部链接，可能是笔记，也可能是附件
-    """
-    # 原始链接的整个 HTML 内容，包括 <a href="link....">名称</a>
-    outerhtml: str = None
-
-    # 链接的 title
-    title: str = None
-
-    # 原始链接中的资源 guid，可能是 attachemnt 或者是 document
-    guid: str = None
-
-    # 值为 open_attachment 或者 open_document
-    type_: str = 'open_attachment'
-
-    def __init__(self, outerhtml: str, guid: str, title: str, type_: str) -> None:
-        self.outerhtml = outerhtml
-        self.guid = guid
-        self.title = title
-        self.type_ = type_
-
-    def __repr__(self) -> str:
-        return f'<WizInternalLink {self.type_}, {self.title}, {self.guid}>'
-
-
-class WizImage(object):
-    """ 在为知笔记文章中包含的本地图像
-
-    在为知笔记中，本地图像不属于资源，也没有自己的 guid
-    """
-    # 原始图像的整个 HTML 内容，包括 <img src="index_files/name.jpg">
-    outerhtml: str = None
-
-    # 仅包含图像的 src 部分
-    src: str = None
-
-    # 图像文件的 Path 对象，在硬盘上的路径
-    file: Path = None
-
-    def __init__(self, outerhtml: str, src: str, note_extract_dir: Path) -> None:
-        self.outerhtml = outerhtml
-        self.src = src
-        self.file = note_extract_dir.joinpath(src)
-
-        if not self.file.exists():
-            raise FileNotFoundError(f'找不到文件 {self.file}！')
-
-    def __repr__(self) -> str:
-        return f'<WizImage {self.src}, {self.outerhtml}>'
+from w2j.parser import parse_wiz_html, tots, WizInternalLink, WizImage
 
 
 class WizAttachment(object):
@@ -231,38 +180,13 @@ class WizDocument(object):
             raise BadZipFile(msg)
             # logger.info(msg)
 
-    def _parse_html(self) -> None:
+    def _parse_wiz_note(self) -> None:
         """ 解析 index.html 文件
         """
         if self.note_extract_dir is None:
             raise FileNotFoundError(f'请先解压缩文档 {self.note_file!s} |{self.title}|')
-        index_html = self.note_extract_dir.joinpath('index.html')
-        if not index_html.is_file:
-            raise FileNotFoundError(f'主文档文件不存在！ {index_html!s} |{self.title}|')
 
-        html_body, open_attachments, open_documents = parse_wiz_html(index_html, self.title)
-        self.body = html_body
-        self.internal_links = []
-
-        for open_attachement in open_attachments:
-            link = WizInternalLink(
-                open_attachement.group(0),
-                open_attachement.group(2),
-                open_attachement.group(3),
-                open_attachement.group(1))
-            self.internal_links.append(link)
-        for open_document in open_documents:
-            link = WizInternalLink(
-                open_document.group(0),
-                open_document.group(2),
-                open_document.group(4),
-                open_document.group(1))
-            self.internal_links.append(link)
-
-        self.images = []
-        for image in parse_wiz_image(html_body):
-            img = WizImage(image.group(0), image.group(1), self.note_extract_dir)
-            self.images.append(img)
+        self.body, self.internal_links, self.images = parse_wiz_html(self.note_extract_dir, self.title)
 
     def resolve_body(self) -> None:
         """ 解压文档压缩包，解析文档正文中的图像文件，将其转换为 WizImage
@@ -270,7 +194,7 @@ class WizDocument(object):
         """
         self.check_note_file()
         self._extract_zip()
-        self._parse_html()
+        self._parse_wiz_note()
 
     def resolve(self, attachments: list[WizAttachment], tags: list[WizTag]) -> None:
         self.resolve_attachments(attachments)
@@ -543,8 +467,8 @@ class WizStorage(object):
         for row in tag_rows:
             tags.append(WizTag(*row))
 
-        document = WizDocument(*document_row, self.data_dir.notes_dir, check_file=True)
-        document.resolve(attachments, tags, self.work_dir)
+        document = WizDocument(*document_row, self.data_dir.notes_dir, self.documents_dir, check_file=True)
+        document.resolve(attachments, tags)
         return document
 
     def resolve(self) -> None:
