@@ -17,6 +17,8 @@ def work_dir():
 
 @pytest.fixture(scope='session')
 def ws(wiz_user_id: str, work_dir: Path):
+    """ 提供一个为知笔记存储对象
+    """
     wiznote_dir = Path('~/.wiznote').expanduser()
     ws = wiz.WizStorage(wiz_user_id, wiznote_dir, is_group_storage=False, work_dir=work_dir)
     return ws
@@ -30,10 +32,28 @@ def wiz_user_id():
 @pytest.fixture(scope='session')
 def jda():
     return joplin.JoplinDataAPI(
-        token='90284420dc2db743d6ac1b803346c7330fdbf5d1f6a26a10f42dee448a7d35895b470bcffcb0061d90a742e513a33d7dd6b858c7ebfc89538fab0e69e682aa21'
+        token='d3098caff3d80561bf915c15cf3f70956c3550fc13e67bee78f74b1a6b2d2632dff10667668cc6682df27d493aa35492b68fa3f642f738fd80547acf571dc17c'
     )
+
+@pytest.fixture(scope='session')
+def js():
+    joplin_dir = Path('~/.config/joplin-desktop').expanduser()
+    return joplin.JoplinStorage(joplin_dir)
 
 
 @pytest.fixture(scope='session')
 def adapter(ws: wiz.WizStorage, jda: joplin.JoplinDataAPI, work_dir: Path):
     return Adapter(ws, jda, work_dir)
+
+
+@pytest.fixture(scope='session')
+def wsg(wiz_user_id: str, work_dir: Path):
+    """ 提供一个为知笔记 Group 存储对象
+    """
+    wiznote_dir = Path('~/.wiznote').expanduser()
+    wsg = wiz.WizStorage(wiz_user_id, wiznote_dir, is_group_storage=True, work_dir=work_dir)
+    return wsg
+
+@pytest.fixture(scope='session')
+def adapter_group(wsg: wiz.WizStorage, jda: joplin.JoplinDataAPI, work_dir: Path):
+    return Adapter(wsg, jda, work_dir)

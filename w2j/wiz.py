@@ -307,7 +307,7 @@ class DataDir(object):
 
 
 class WizStorage(object):
-    """ 保存所有位置笔记的数据
+    """ 保存所有为知笔记的数据
     """
     # 工作文件夹所在地址，临时文件会置于工作文件夹中
     work_dir: Path

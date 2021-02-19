@@ -551,25 +551,7 @@ class Adapter(object):
            )
 
         folder = self.cu.get_folder(location=document.location)
-        kwargs = {
-            'id': note_id,
-            'parent_id': folder.id,
-            'title': document.title,
-            'markup_language': 1 if document.is_markdown else 2,
-            'created_time': document.created,
-            'updated_time': document.modified,
-        }
-        if document.url:
-            kwargs['source_url'] = document.url
-        if document.is_markdown:
-            kwargs['body'] = body
-        else:
-            kwargs['body'] = body
-            # 使用转换，可能导致不准确
-            # kwargs['body_html'] = body
-            # kwargs['convert_to'] = 'html'
-
-        note: JoplinNote = self.jda.post_note(**kwargs)
+        note: JoplinNote = self.jda.post_note(note_id, document.title, body, document.is_markdown, folder.id, document.url)
         note.internal_links = joplin_internal_links
         note.folder = folder
         note.tags = self.cu.get_tags(note.id)
@@ -581,6 +563,8 @@ class Adapter(object):
         """ 获取一个 location 下的所有 location
         """
         cur_l2f = self.cu.l2f_cache.get(location)
+        if cur_l2f is None:
+            raise ValueError(f'找不到 {location}')
         for l2f in self.cu.l2f_cache.values():
             if l2f.parent_location and l2f.level > cur_l2f.level and l2f.parent_location == location:
                 # print(f'{cur_l2f.level} {l2f.level} {self.cu.folder_max_level} {l2f.parent_location} {l2f.location} {location}')
@@ -588,7 +572,7 @@ class Adapter(object):
                 self._get_locations(l2f.location, locations)
 
     def sync_note_by_location(self, location: str, with_children: bool=True) -> None:
-        """ 同步指定为知笔记 location 中所有的笔记
+        """ 同步指定为知笔记目录中所有的笔记
         """
         self.sync_folders()
         self.sync_tags()
@@ -606,4 +590,6 @@ class Adapter(object):
         """
         self.sync_folders()
         self.sync_tags()
-        pass
+        logger.info(f'为知笔记转换所有文档 {len(self.ws.documents)} 篇。')
+        for wd in self.ws.documents:
+            self._sync_note(wd)
