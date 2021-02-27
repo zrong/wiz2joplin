@@ -1,3 +1,4 @@
 chardet
 httpx
+inscriptis
 pytest

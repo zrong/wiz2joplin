@@ -14,14 +14,15 @@ from inscriptis import get_text
 RE_A_START = r'<a href="'
 RE_A_END = r'">([^<]+)</a>'
 
-# 早期的连接没有双斜杠
+# 附件内链
+# 早期的链接没有双斜杠
 # wiz:open_attachment?guid=8337764c-f89d-4267-bdf2-2e26ff156098
+# 后期的链接有双斜杠
 # wiz://open_attachment?guid=52935f17-c1bb-45b7-b443-b7ba1b6f854e
-# 
 RE_OPEN_ATTACHMENT_HREF = r'wiz:/{0,2}(open_\w+)\?guid=([a-z0-9\-]{36})'
 RE_OPEN_ATTACHMENT_OUTERHTML = RE_A_START + RE_OPEN_ATTACHMENT_HREF + RE_A_END
 
-
+# 文档内链，只需要提取 guid 后面的部分即可
 # wiz://open_document?guid=c6204f26-f966-4626-ad41-1b5fbdb6829e&amp;kbguid=&amp;private_kbguid=69899a48-dc52-11e0-892c-00237def97cc
 RE_OPEN_DOCUMENT_HREF = r'wiz:/{0,2}(open_\w+)\?guid=([a-z0-9\-]{36})&amp;kbguid=&amp;private_kbguid=([a-z0-9\-]{36})'
 RE_OPEN_DOCUMENT_OUTERHTML = RE_A_START + RE_OPEN_DOCUMENT_HREF + RE_A_END
