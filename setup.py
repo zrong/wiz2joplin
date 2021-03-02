@@ -25,6 +25,8 @@ def find_requires(*file_paths):
     require_file = read(*file_paths)
     return require_file.splitlines()
 
+def static_requires():
+    return ['idna==2.10', 'chardet', 'httpx', 'inscriptis']
 
 classifiers = [
     'Programming Language :: Python :: 3.9',
@@ -45,6 +47,7 @@ entry_points = {
 }
 
 package_data = {
+    '': ['requirements.txt']
 }
 
 
@@ -61,7 +64,7 @@ setup(
     license = "GPLv3",
     keywords = "development zrong wiznote joplin",
     packages = find_packages(exclude=['test*', 'output', 'venv']),
-    install_requires=find_requires('requirements.txt'),
+    install_requires=static_requires(),
     entry_points=entry_points,
     include_package_data = True,
     zip_safe=False,

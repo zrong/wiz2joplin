@@ -10,9 +10,9 @@ from pathlib import Path
 import argparse
 
 __autho__ = 'zrong'
-__version__ = '0.1'
+__version__ = '0.4'
 
-work_dir = Path(__file__).parent.parent.joinpath('output/')
+work_dir = Path.cwd()
 logger = logging.Logger('w2j')
 log_file = work_dir.joinpath('w2j.log')
 log_handler = logging.FileHandler(log_file)
