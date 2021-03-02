@@ -1,5 +1,3 @@
-## Project description
-
 Migrate from WizNote to Joplin.
 
 ## Dependency
@@ -31,13 +29,13 @@ If your WizNote user id is `youremail@yourdomain.com`, the token in Joplin Web C
 Convert all of documents from wizNote to Joplin:
 
 ``` shell
-w2j -o ~/w2j -w ~/.wiznote -u youremail@yourdomain.com -t aa630825022a340ecbe5d3e2f25e5f6abb7a3c9e96b684954f63c71419b5d6 -a
+w2j -o ~/w2j -w ~/.wiznote -u youremail@yourdomain.com -t aa630825022a340ecbe5d3e2f25e5f6a -a
 ```
 
 Convert location `/My Notes/reading/` and all of the children documents from WizNote to Joplin:
 
 ``` shell
-w2j -o ~/w2j -w ~/.wiznote -u youremail@yourdomain.com -t aa630825022a340ecbe5d3e2f25e5f6abb7a3c9e96b684954f63c71419b5d6 -l '/My Note/reading/' -r
+w2j -o ~/w2j -w ~/.wiznote -u youremail@yourdomain.com -t aa630825022a340ecbe5d3e2f25e5f6a -l '/My Note/reading/' -r
 
 ```
 
