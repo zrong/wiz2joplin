@@ -1,5 +1,11 @@
 Migrate from WizNote to Joplin.
 
+## !!!CAUTION!!!!
+
+wiz2joplin has only been tested in wizNote for Mac 2.8.7. AFAIK, the folder structure of the macOS and Windows versions of wizNote may be different.
+
+If you can provide a pull request for wizNote of Windows, I believe it will be helpful to many people.
+
 ## Dependency
 
 - Python 3.9
