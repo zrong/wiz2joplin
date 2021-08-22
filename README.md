@@ -2,7 +2,10 @@ Migrate from WizNote to Joplin.
 
 ## Dependency
 
-python 3.9
+- Python 3.9
+- macOS Catalina or above
+- wizNote for Mac 2.8.7 (2020.8.20 10:28)
+- ![wiznote for macOS](wiznoteformac.png)
 
 ## Installation
 
