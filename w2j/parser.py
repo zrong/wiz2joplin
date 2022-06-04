@@ -30,6 +30,7 @@ RE_OPEN_DOCUMENT_OUTERHTML = RE_A_START + RE_OPEN_DOCUMENT_HREF + RE_A_END
 
 # 图像文件在 body 中存在的形式，即使是在 .md 文件中，也依然使用这种形式存在
 RE_IMAGE_OUTERHTML = r'<img .*?src="(index_files/[^"]+)"[^>]*>'
+RE_IMAGE_MARKDOWN = r'!\[[^\[\]]*\]\((index_files/((?!&nbsp;&quot;.*&quot;)[^\(\)])+)\)'
 
 
 class WizInternalLink(object):
@@ -123,6 +124,13 @@ def parse_wiz_html(note_extract_dir: Path, title: str) -> tuple[str, list[WizInt
     for image in image_match:
         img = WizImage(image.group(0), image.group(1), note_extract_dir)
         images.append(img)
+    image_match = re.finditer(RE_IMAGE_MARKDOWN, html_body, re.IGNORECASE)
+    for image in image_match:
+        try:
+            img = WizImage(image.group(0), image.group(1), note_extract_dir)
+            images.append(img)
+        except FileNotFoundError as e:
+            print(e)
     return html_body, internal_links, images
 
 
