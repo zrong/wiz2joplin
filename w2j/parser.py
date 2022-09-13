@@ -4,12 +4,11 @@
 ##############################
 
 from datetime import datetime, timezone, timedelta
-from os import link
 from pathlib import Path
 import re
 import chardet
 from inscriptis import get_text
-
+from typing import List
 
 RE_A_START = r'<a href="'
 RE_A_END = r'">([^<]+)</a>'
@@ -83,7 +82,7 @@ class WizImage(object):
         return f'<WizImage {self.src}, {self.outerhtml}>'
 
 
-def parse_wiz_html(note_extract_dir: Path, title: str) -> tuple[str, list[WizInternalLink], list[WizImage]]:
+def parse_wiz_html(note_extract_dir: Path, title: str) -> tuple[str, list[WizInternalLink], List[WizImage]]:
     """ 在为知笔记文档的 index.html 中搜索内链的附件和文档链接
     """
     index_html = note_extract_dir.joinpath('index.html')
@@ -164,7 +163,7 @@ class JoplinInternalLink(object):
     # 链接的整个文本内容，可能是 markdown 格式也可能是html格式，取决于 note_id 是何种格式
     outertext: str
 
-    def __init__(self, note_id: str, resource_id: str, title: str, link_type: int, outertext:str='') -> None:
+    def __init__(self, note_id: str, resource_id: str, title: str, link_type: str, outertext:str='') -> None:
         self.note_id = note_id
         self.resource_id = resource_id
         self.title = title

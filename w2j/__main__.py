@@ -6,6 +6,8 @@
 # python -m w2j
 ##############################
 
+# 已知问题
+# FIXME wiznote html中的代码转换格式存在一定问题
 import sys
 import os
 

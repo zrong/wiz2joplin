@@ -473,7 +473,7 @@ class Adapter(object):
         jr: JoplinResource = self.cu.resources.get(resource_id)
         if jr is not None:
             logger.warning(f'resource {resource_id} |{jr.title}|已经存在！')
-            return
+            return jr
         jr = self.jda.post_resource(
             attach.file,
             1,
@@ -523,6 +523,7 @@ class Adapter(object):
 
         # 上传附件
         for attachment in document.attachments:
+            # 不是知道这个":"用法,是不是良好习惯，一直以为只能用在func定义返回类型
             jr: JoplinResource = self._upload_wiz_attachment(attachment)
             resources_in_note[jr.id] = jr
 
