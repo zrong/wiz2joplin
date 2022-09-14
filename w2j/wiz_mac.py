@@ -36,15 +36,14 @@ class WizAttachment(object):
     # 附件的文件名所在地
     file: Path = None
 
-    def __init__(self, guid: str, doc_guid: str, name: str,
-                 modified: str, attachments_dir: Path, check_file: bool = False) -> None:
+    def __init__(self, guid: str, doc_guid: str, name: str, modified: str, attachments_dir: Path, check_file: bool = False) -> None:
         self.guid = guid
         self.doc_guid = doc_guid
         self.name = name
         self.modified = tots(modified)
-        self.file = attachments_dir
-        # self.file_name =f'{{{self.name}}}{"_Attachments"}'  # TODO
-        # self.file = attachments_dir.joinpath(self.file_name)
+        self.file_name =f'{{{self.guid}}}{self.name}'
+
+        self.file = attachments_dir.joinpath(self.file_name)
         if check_file:
             self.check_file()
     
@@ -126,13 +125,7 @@ class WizDocument(object):
     # 包含在为知笔记文档中的内部链接，需要在文档征文中使用正则提取
     internal_links: list[WizInternalLink] = []
 
-    def __init__(self, guid: str, document_name: str, location: str, url: str,
-                 created: str, modified: str, attachment_count: int,
-                 notes_dir: Path, documents_dir: Path, check_file: bool = False) -> None:
-        """
-        windows下 DOCUMENT_TITLE 和 DOCUMENT_NAME似乎和mac下起到了相反的作用，
-        win下DOCUMENT_TITLE会有截断，DOCUMENT_NAME存储了完整的文件名
-        """
+    def __init__(self, guid: str, title: str, location: str, url: str, created: str, modified: str, attachment_count: int, notes_dir: Path, documents_dir: Path, check_file: bool = False) -> None:
         self.guid = guid
         self.location = location
         self.url = url
@@ -141,30 +134,22 @@ class WizDocument(object):
         self.attachment_count = attachment_count
 
         self.documents_dir = documents_dir
-        self.title = document_name[:-4]
-        self.is_markdown = self.title.endswith('.md')
-        if self.is_markdown and len(self.title) > 3:
-            self.title = self.title[:-3]
 
-        # self.note_file = notes_dir.joinpath(f'{{{self.guid}}}')
-        self.note_file = notes_dir.joinpath(document_name)
+        self.is_markdown = title.endswith('.md')
+        if self.is_markdown and len(title) > 3:
+            self.title = title[:-3]
+        else:
+            self.title = title
+
+        self.note_file = notes_dir.joinpath(f'{{{self.guid}}}')
         if check_file:
             self.check_note_file()
-
-    def resolve_note_dir(self) -> None:
-        """
-        获取windows下的目录地址
-        """
-
 
     def check_note_file(self):
         if self.note_file is None or not self.note_file.exists():
             raise FileNotFoundError(f'找不到 note 文件 {self.note_file}！')
 
     def resolve_attachments(self, attachments: list[WizAttachment]) -> None:
-        """
-        @param: attachments
-        """
         self.attachments = attachments
         if len(self.attachments) != self.attachment_count:
             raise ValueError(f'附件数量不匹配 {len(self.attachments)} != {self.attachment_count}！')
@@ -226,12 +211,11 @@ class DataDir(object):
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
 
-        # self.attachments_dir = self.data_dir.joinpath('attachments/')
-        # if not self.attachments_dir.is_dir():
-        #     raise FileNotFoundError(f'找不到文件夹 {self.attachments_dir.resolve()}！')
+        self.attachments_dir = self.data_dir.joinpath('attachments/')
+        if not self.attachments_dir.is_dir():
+            raise FileNotFoundError(f'找不到文件夹 {self.attachments_dir.resolve()}！')
 
-        # Windows下的note保存使用笔记目录逻辑，此处的self.note_dir是笔记文件根目录
-        self.notes_dir = self.data_dir.joinpath('')
+        self.notes_dir = self.data_dir.joinpath('notes/')
         if not self.notes_dir.is_dir():
             raise FileNotFoundError(f'找不到文件夹 {self.notes_dir.resolve()}！')
 
@@ -239,7 +223,7 @@ class DataDir(object):
         if not self.index_db.exists():
             raise FileNotFoundError(f'找不到数据库 {self.index_db.resolve()}！')
 
-        self.wizthumb_db = self.data_dir.joinpath('thumb.db')
+        self.wizthumb_db = self.data_dir.joinpath('wizthumb.db')
         if not self.wizthumb_db.exists():
             raise FileNotFoundError(f'找不到数据库 {self.wizthumb_db.resolve()}！')
 
@@ -283,27 +267,10 @@ class DataDir(object):
         """
         conn = sqlite3.connect(self.index_db)
         cur = conn.cursor()
-        cur.execute('SELECT DOCUMENT_GUID, DOCUMENT_NAME, DOCUMENT_LOCATION, DOCUMENT_URL, DT_CREATED, DT_MODIFIED, DOCUMENT_ATTACHEMENT_COUNT FROM WIZ_DOCUMENT')
+        cur.execute('SELECT DOCUMENT_GUID, DOCUMENT_TITLE, DOCUMENT_LOCATION, DOCUMENT_URL, DT_CREATED, DT_MODIFIED, DOCUMENT_ATTACHEMENT_COUNT FROM WIZ_DOCUMENT')
         rows = cur.fetchall()
         conn.close()
         return rows
-
-    def _get_attachment_location_dict(self) -> dict:
-        """获取附件对应文件名，GUID，LOCATION
-        """
-        conn = sqlite3.connect(self.index_db)
-        cur = conn.cursor()
-        cur.execute(
-            'SELECT ATTACHMENT_GUID, ATTACHMENT_NAME, DOCUMENT_LOCATION, DOCUMENT_NAME FROM WIZ_DOCUMENT_ATTACHMENT A LEFT JOIN WIZ_DOCUMENT B ON A.DOCUMENT_GUID = B.DOCUMENT_GUID')
-        rows = cur.fetchall()
-        conn.close()
-        attachment_dict = dict()
-        for row in rows:
-            ATTACHMENT_GUID, ATTACHMENT_NAME, DOCUMENT_LOCATION, DOCUMENT_NAME = row
-            relative_path = DOCUMENT_LOCATION + DOCUMENT_NAME[:-4] + "_Attachments/" + ATTACHMENT_NAME
-            attachment_dict[ATTACHMENT_GUID] = Path(self.data_dir, relative_path[1:])
-
-        return attachment_dict
 
     def _get_all_attachment(self) -> list:
         """ 获取 WIZ_DOCUMENT_ATTACHMENT 的所有记录
@@ -376,10 +343,6 @@ class WizStorage(object):
     # 所有的文档
     documents: list[WizDocument] = []
 
-    # note数据库
-    note_rows: list[tuple]
-
-
     def __init__(self, user_id: str, wiznote_dir: Path, is_group_storage: bool = False, work_dir: Path = None):
         """ 定义位置笔记文件夹
         :param user_id: 帐号邮箱
@@ -400,9 +363,8 @@ class WizStorage(object):
         self.is_group_storage = is_group_storage
 
         # data 的根文件夹
-        root_data_dir = DataDir(self.user_dir.joinpath(''))
+        root_data_dir = DataDir(self.user_dir.joinpath('data/'))
         # 获取 group 仓库，位于 data 根文件夹之下
-        # FIXME 没有用过group，不知道改这里会不会有问题
         if self.is_group_storage:
             biz_guid = self._get_biz_guid(root_data_dir.index_db)
             self.data_dir = DataDir(self.group_dir.joinpath(biz_guid))
@@ -454,42 +416,23 @@ class WizStorage(object):
         创建一个 dict ，键名为文档 guid，键值为该文档中的 attachment 列表
         返回这两个列表
         """
-        attach_rows = self.data_dir._get_all_attachment()
+        rows = self.data_dir._get_all_attachment()
         attachments: list[WizAttachment] = []
 
         attachments_in_document: dict[str, list[WizAttachment]] = {}
-        """
-        Windows 下获取Attachment位置.
-        为知笔记老版本的Attachment位置为笔记目录下的 f"{note_name}__Attachments"
-        在这里获取相应的位置
-        """
-        # self.data_dir.attachments_dir = Path(self.wiznote_dir)
 
-        self.data_dir.attachments_dict = self.data_dir._get_attachment_location_dict()
-        for row in attach_rows:
-
-            attachment = WizAttachment(*row, attachments_dir=self.data_dir.attachments_dict[row[0]])
+        for row in rows:
+            attachment = WizAttachment(*row, self.data_dir.attachments_dir)
             attachments.append(attachment)
             if attachments_in_document.get(attachment.doc_guid) is None:
                 attachments_in_document[attachment.doc_guid] = []
             attachments_in_document[attachment.doc_guid].append(attachment)
         return attachments, attachments_in_document
 
-        # self.data_dir.attachments_dir = Path(self.wiznote_dir)
-        #
-        #
-        # for row in attach_rows:
-        #     attachment = WizAttachment(*row, attachments_dir=self.data_dir.attachments_dir)
-        #     attachments.append(attachment)
-        #     if attachments_in_document.get(attachment.doc_guid) is None:
-        #         attachments_in_document[attachment.doc_guid] = []
-        #     attachments_in_document[attachment.doc_guid].append(attachment)
-        # return attachments, attachments_in_document
-
     def build_documents(self) -> list[WizDocument]:
         """ 根据数据库内容构建所有的 document 列表
         """
-        self.note_rows = self.data_dir._get_all_document()
+        rows = self.data_dir._get_all_document()
 
         attachments, attachments_in_doc = self._build_attachments()
         tags, tags_in_doc = self._build_tags()
@@ -500,13 +443,9 @@ class WizStorage(object):
         self.tags_in_document = tags_in_doc
 
         documents: list[WizDocument] = []
-        for row in self.note_rows:
-            # 对于每一个笔记获取相应的note_dir
-            # windows这里path.join 处理连接目录时，如果链接变量以"/"开头，连接时会直接将该目录连接到根目录
-            notes_dir = self.data_dir.notes_dir.joinpath(row[2][1:] if row[2].startswith("/") else row[2])
-            document = WizDocument(*row, notes_dir=notes_dir, documents_dir=self.documents_dir, check_file=True)
+        for row in rows:
+            document = WizDocument(*row, self.data_dir.notes_dir, self.documents_dir, check_file=True)
             document.resolve(
-                # 这里zrong逻辑应该是从attachment库中获取相应的附件，但是windows下并不是这种模式
                 self.attachments_in_document.get(document.guid, []),
                 self.tags_in_document.get(document.guid, [])
             )

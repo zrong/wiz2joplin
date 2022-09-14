@@ -3,7 +3,7 @@ from os import environ
 
 import pytest
 
-from w2j import wiz, joplin
+from w2j import wiz_win, joplin
 from w2j.adapter import Adapter
 
 

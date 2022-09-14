@@ -1,4 +1,4 @@
-from w2j.wiz import WizStorage
+from w2j.wiz_win import WizStorage
 from pathlib import Path
 import pytest
 

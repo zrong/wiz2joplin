@@ -3,14 +3,17 @@
 #
 # 适配器，将解析后的为知笔记对象装备成 joplin 笔记对象
 ##############################
-
+import sys
 from pathlib import Path
 from typing import Optional, Union
 import json
 import sqlite3
 
 from w2j import logger, work_dir as default_work_dir
-from w2j.wiz import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
+if sys.platform == "win32":
+    from w2j.wiz_win import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
+else:
+    from w2j.wiz_mac import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
 from w2j.joplin import JoplinNote, JoplinFolder, JoplinResource, JoplinTag, JoplinDataAPI
 from w2j.parser import tojoplinid, towizid, convert_joplin_body, JoplinInternalLink
 

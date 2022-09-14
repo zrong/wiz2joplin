@@ -2,9 +2,10 @@ Migrate from WizNote to Joplin.
 
 ## !!!CAUTION!!!!
 
-wiz2joplin has only been tested in wizNote for Mac 2.8.7. AFAIK, the folder structure of the macOS and Windows versions of wizNote may be different.
+wiz2joplin 0.5 has only been tested in wizNote for Win with wiznote ver4.14.2, not test in wiznoteX.
+the folder structure of the macOS and Windows versions of wizNote is different, but maybe this version is also compatible for mac.
 
-If you can provide a pull request for wizNote of Windows, I believe it will be helpful to many people.
+
 
 ## Dependency
 
@@ -54,7 +55,7 @@ Use `w2j --help` to show usage for w2j:
 usage: w2j [-h] --output OUTPUT --wiz-dir WIZNOTE_DIR --wiz-user
            WIZNOTE_USER_ID --joplin-token JOPLIN_TOKEN
            [--joplin-host JOPLIN_HOST] [--joplin-port JOPLIN_PORT]
-           [--location LOCATION] [--location-children] [--all]
+           [--location LOCATION] [--location-children] [--all][--log-level]
 
 Migrate from WizNote to Joplin.
 
@@ -86,6 +87,8 @@ optional arguments:
                         Use with --location parameter, convert all children
                         location of --location.
   --all, -a             Convert all documents of your WizNote.
+  --log-level           Use with --log-level to set the log level, default is INFO,
+                        other choice are "CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG".
 ```
 
 ## Log file
