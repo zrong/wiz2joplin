@@ -4,12 +4,11 @@
 ##############################
 
 from datetime import datetime, timezone, timedelta
-from os import link
 from pathlib import Path
 import re
 import chardet
 from inscriptis import get_text
-
+from typing import List
 
 RE_A_START = r'<a href="'
 RE_A_END = r'">([^<]+)</a>'
@@ -30,7 +29,7 @@ RE_OPEN_DOCUMENT_OUTERHTML = RE_A_START + RE_OPEN_DOCUMENT_HREF + RE_A_END
 
 # 图像文件在 body 中存在的形式，即使是在 .md 文件中，也依然使用这种形式存在
 RE_IMAGE_OUTERHTML = r'<img .*?src="(index_files/[^"]+)"[^>]*>'
-
+RE_IMAGE_MARKDOWN = r'!\[[^\[\]]*\]\((index_files/((?!&nbsp;&quot;.*&quot;)[^\(\)])+)\)'
 
 class WizInternalLink(object):
     """ 嵌入 html 正文中的为知笔记内部链接，可能是笔记，也可能是附件
@@ -83,7 +82,7 @@ class WizImage(object):
         return f'<WizImage {self.src}, {self.outerhtml}>'
 
 
-def parse_wiz_html(note_extract_dir: Path, title: str) -> tuple[str, list[WizInternalLink], list[WizImage]]:
+def parse_wiz_html(note_extract_dir: Path, title: str) -> tuple[str, list[WizInternalLink], List[WizImage]]:
     """ 在为知笔记文档的 index.html 中搜索内链的附件和文档链接
     """
     index_html = note_extract_dir.joinpath('index.html')
@@ -123,6 +122,15 @@ def parse_wiz_html(note_extract_dir: Path, title: str) -> tuple[str, list[WizInt
     for image in image_match:
         img = WizImage(image.group(0), image.group(1), note_extract_dir)
         images.append(img)
+    # Modified by mrcat
+    # 增加识别 markdown 笔记类型中的本地图片链接
+    image_match = re.finditer(RE_IMAGE_MARKDOWN, html_body, re.IGNORECASE)
+    for image in image_match:
+        try:
+            img = WizImage(image.group(0), image.group(1), note_extract_dir)
+            images.append(img)
+        except FileNotFoundError as e:
+            print(e)
     return html_body, internal_links, images
 
 
@@ -164,7 +172,7 @@ class JoplinInternalLink(object):
     # 链接的整个文本内容，可能是 markdown 格式也可能是html格式，取决于 note_id 是何种格式
     outertext: str
 
-    def __init__(self, note_id: str, resource_id: str, title: str, link_type: int, outertext:str='') -> None:
+    def __init__(self, note_id: str, resource_id: str, title: str, link_type: str, outertext:str='') -> None:
         self.note_id = note_id
         self.resource_id = resource_id
         self.title = title

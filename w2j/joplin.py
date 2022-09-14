@@ -75,6 +75,7 @@ class JoplinResource(object):
     # 所有必须的 fields 名称
     fields = ['id', 'title', 'created_time', 'updated_time', 'filename', 'file_extension']
 
+
     @classmethod
     def fields_str(cls) -> str:
         return ','.join(cls.fields)
@@ -189,7 +190,8 @@ class JoplinDataAPI(object):
     
     client: httpx.Client = None
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 41184, token: str = 'ad9b597aac8c9fa2083cb23c4354eb589b1252e6a366185d94795077ed076dfdb312c22b8640a05e5af7b784d65d831a429771e3cc2bcbe3f9cdac441d6fcca6') -> None:
+    def __init__(self, host: str = '127.0.0.1', port: int = 41184,
+                 token: str = 'ad9b597aac8c9fa2083cb23c4354eb589b1252e6a366185d94795077ed076dfdb312c22b8640a05e5af7b784d65d831a429771e3cc2bcbe3f9cdac441d6fcca6') -> None:
         self.host = host
         self.port = port
         self.token = token

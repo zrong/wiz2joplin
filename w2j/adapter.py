@@ -3,14 +3,17 @@
 #
 # 适配器，将解析后的为知笔记对象装备成 joplin 笔记对象
 ##############################
-
+import sys
 from pathlib import Path
 from typing import Optional, Union
 import json
 import sqlite3
 
 from w2j import logger, work_dir as default_work_dir
-from w2j.wiz import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
+if sys.platform == "win32":
+    from w2j.wiz_win import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
+else:
+    from w2j.wiz_mac import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
 from w2j.joplin import JoplinNote, JoplinFolder, JoplinResource, JoplinTag, JoplinDataAPI
 from w2j.parser import tojoplinid, towizid, convert_joplin_body, JoplinInternalLink
 
@@ -473,7 +476,7 @@ class Adapter(object):
         jr: JoplinResource = self.cu.resources.get(resource_id)
         if jr is not None:
             logger.warning(f'resource {resource_id} |{jr.title}|已经存在！')
-            return
+            return jr
         jr = self.jda.post_resource(
             attach.file,
             1,
@@ -523,6 +526,7 @@ class Adapter(object):
 
         # 上传附件
         for attachment in document.attachments:
+            # 不是知道这个":"用法,是不是良好习惯，一直以为只能用在func定义返回类型
             jr: JoplinResource = self._upload_wiz_attachment(attachment)
             resources_in_note[jr.id] = jr
 
