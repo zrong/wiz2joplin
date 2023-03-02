@@ -75,6 +75,7 @@ class JoplinResource(object):
     # 所有必须的 fields 名称
     fields = ['id', 'title', 'created_time', 'updated_time', 'filename', 'file_extension']
 
+
     @classmethod
     def fields_str(cls) -> str:
         return ','.join(cls.fields)
@@ -189,7 +190,8 @@ class JoplinDataAPI(object):
     
     client: httpx.Client = None
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 41184, token: str = 'ad9b597aac8c9fa2083cb23c4354eb589b1252e6a366185d94795077ed076dfdb312c22b8640a05e5af7b784d65d831a429771e3cc2bcbe3f9cdac441d6fcca6') -> None:
+    def __init__(self, host: str = '127.0.0.1', port: int = 41184,
+                 token: str = 'ad9b597aac8c9fa2083cb23c4354eb589b1252e6a366185d94795077ed076dfdb312c22b8640a05e5af7b784d65d831a429771e3cc2bcbe3f9cdac441d6fcca6') -> None:
         self.host = host
         self.port = port
         self.token = token
@@ -267,17 +269,17 @@ class JoplinDataAPI(object):
         return folders, has_more, next_page
 
     def get_folder_note(self, guid: str) -> list[JoplinFolder]:
-        """ 获取一个 folder 下的所有 note
+        """ Get one folder All under note
         """
         query = self._build_query(fields=JoplinNote.fields_str())
         resp = self.client.get('/folders/{guid}/notes', params=query)
         return JoplinNote(**resp.json())
 
     def post_folder(self, **kwargs) -> JoplinFolder:
-        """ 创建一个新的 folder
+        """ Create a new one folder
         """
         query = self._build_query()
-        logger.info(f'向 Joplin 增加 folder {kwargs}')
+        logger.info(f'to Joplin add folder {kwargs}')
         resp = self.client.post('/folders', params=query, json=kwargs)
         data = resp.json()
         if data.get('error'):
@@ -286,10 +288,10 @@ class JoplinDataAPI(object):
         return JoplinFolder(**data)
 
     def post_tag(self, **kwargs) -> JoplinTag:
-        """ 创建一个新的 tag
+        """ Create a new one tag
         """
         query = self._build_query()
-        logger.info(f'向 Joplin 增加 tag {kwargs}')
+        logger.info(f'To Joplin add tag {kwargs}')
         resp = self.client.post('/tags', params=query, json=kwargs)
         data = resp.json()
         if data.get('error'):
@@ -303,7 +305,7 @@ class JoplinDataAPI(object):
         query = self._build_query(fields=JoplinTag.fields_str())
         resp = self.client.get(f'/tags/{guid}', params=query)
         data = resp.json()
-        logger.info(f'从 Joplin 获取 tag {guid}: {data}')
+        logger.info(f'From Joplin get tag {guid}: {data}')
         if data.get('error'):
             logger.error(data['error'])
             raise ValueError(data['error'])
@@ -314,14 +316,14 @@ class JoplinDataAPI(object):
         """
         query = self._build_query()
         files = {'data': open(file, 'rb')}
-        # 经过测试 props 中只有 title 和 id 有作用，其他的参数都无效
+        # Tested props only title and id it works, other parameters are invalid
         data = {'props': json.dumps(kwargs)}
-        logger.info(f'向 Joplin 增加 resource {file} {kwargs}')
+        logger.info(f'to Joplin add resource {file} {kwargs}')
         resp = self.client.post('/resources', params=query, files=files, data=data)
         data = resp.json()
         if data.get('error'):
             logger.error(data['error'])
-            raise ValueError(data['error'])
+            #raise ValueError(data['error'])
         return JoplinResource(**data, resource_type=resource_type)
 
     def get_resource(self, guid: str) -> JoplinResource:
@@ -330,16 +332,16 @@ class JoplinDataAPI(object):
         query = self._build_query(fields=JoplinResource.fields_str())
         resp = self.client.get(f'/resources/{guid}', params=query)
         data = resp.json()
-        logger.info(f'从 Joplin 获取 resource {guid}: {data}')
+        logger.info(f'from Joplin get resource {guid}: {data}')
         if data.get('error'):
             logger.error(data['error'])
             raise ValueError(data['error'])
         return JoplinResource(**data)
 
     def post_note(self, id: str, title: str, body: str, 
-        is_markdown: bool, parent_id: str, source_url: str) -> JoplinNote:
-        """ 创建一个新的 Note
-        隐藏的 Joplin 参数：通过抓包 Joplin WebClipper
+        is_markdown: bool, parent_id: str, source_url: str, created: int, modified: int) -> JoplinNote:
+        """ Create a new one Note
+        hidden Joplin parameter：By grabbing the bag Joplin WebClipper
         
         complete Page Html
         source_command
@@ -375,15 +377,22 @@ class JoplinDataAPI(object):
         if is_markdown:
             kwargs['body'] = body
         else:
-            # 使用 joplin 的功能将所有的 html 都转换成 markdown
+            # use joplin function will be convert all html into markdown
             kwargs['body_html'] = body
             kwargs['convert_to'] = 'markdown'
             kwargs['source_command'] = {
                 'name': 'simplifiedPageHtml',
             }
-
+        kwargs['created_time'] = created
+        kwargs['updated_time'] = modified
+        kwargs['user_created_time'] = created
+        kwargs['user_updated_time'] = modified
+## created_time	int	When the note was created.
+# updated_time	int	When the note was last updated.
+# user_created_time	int	When the note was created. It may differ from created_time as it can be manually set by the user.
+# user_updated_time	int	When the note was last updated. It may differ from updated_time as it can be manually set by the user.
         query = self._build_query()
-        logger.info(f'向 Joplin 增加 note {kwargs}')
+        logger.info(f'to Joplin add note {kwargs}')
         resp = self.client.post('/notes', params=query, json=kwargs)
         data = resp.json()
         if data.get('error'):
@@ -404,12 +413,12 @@ class JoplinDataAPI(object):
 
 
 class JoplinStorage(object):
-    """ 保存 Joplin 数据
+    """ save Joplin data
     """
-    # joplin 资源所在文件夹
+    # joplin folder where resource is located
     joplin_dir: Path
 
-    # joplin 主数据库
+    # joplin main database
     db_file: Path
 
     def __init__(self, joplin_dir: Path) -> None:
@@ -417,7 +426,7 @@ class JoplinStorage(object):
         self.db_file = self.joplin_dir.joinpath('database.sqlite')
 
     def update_time(self, wiz_document_times: list[dict[str, Union[str, int]]]):
-        """ 根据为知笔记的文章更新时间修改 Joplin note 的时间
+        """ Modify according to the update time of the article in the notes for knowledge Joplin note time
         """
         self.conn = sqlite3.connect(self.db_file)
         sql = "UPDATE notes SET created_time=:created_time, updated_time=:updated_time, user_created_time=:created_time, user_updated_time=:updated_time WHERE id=:id;"
