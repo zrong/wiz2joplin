@@ -2,10 +2,23 @@ Migrate from WizNote to Joplin.
 
 ## !!!CAUTION!!!!
 
-wiz2joplin has only been tested in wizNote for Mac 2.8.7. AFAIK, the folder structure of the macOS and Windows versions of wizNote may be different.
+wiz2joplin 0.5 has only been tested in wizNote for Win with wiznote ver4.13.25, not test in wiznoteX.
 
-If you can provide a pull request for wizNote of Windows, I believe it will be helpful to many people.
+The folder structure of the macOS and Windows versions of wizNote is different, but maybe this version is also compatible for mac.
 
+All log messages and error messages translate to english only for windows wersion.
+
+This version migrate DateCreated and DateModified of notes.
+
+Struct of folder on Win:
+```
+<some path> example D:
+  wiz2joplin
+    wiz
+      user@mail.com - Fully copied data directory (ex: C:\Users\user\Documents\My Knowledge\Data\user@mail.com
+    out - empty folder
+    w2j - updated script files (from this fork)
+```
 ## Dependency
 
 - Python 3.9
@@ -19,7 +32,7 @@ To install this tool, you can use pip:
 
 ```
 python -m venv ~/w2j/venv
-source ~/w2j/venv/bin/activate
+~/w2j/venv/bin/activate
 pip install w2j
 ```
 
@@ -38,23 +51,20 @@ If your WizNote user id is `youremail@yourdomain.com`, the token in Joplin Web C
 Convert all of documents from wizNote to Joplin:
 
 ``` shell
-w2j -o ~/w2j -w ~/.wiznote -u youremail@yourdomain.com -t aa630825022a340ecbe5d3e2f25e5f6a -a
+cd w2j
+python __main__.py -o D:\w2j\out -w D:\w2j\wiz -u user@mail.ru -t df9785823ce435759291943653c299873a13c29493a631aa5bc8c37d95749912d931a55d8e01beeb0347a86f4f1bc918c2f2a3899a863d5d8190af0482dd2d65 -a
 ```
-
-Convert location `/My Notes/reading/` and all of the children documents from WizNote to Joplin:
-
-``` shell
-w2j -o ~/w2j -w ~/.wiznote -u youremail@yourdomain.com -t aa630825022a340ecbe5d3e2f25e5f6a -l '/My Note/reading/' -r
 
 ```
 
 Use `w2j --help` to show usage for w2j:
 
 ```
+```
 usage: w2j [-h] --output OUTPUT --wiz-dir WIZNOTE_DIR --wiz-user
            WIZNOTE_USER_ID --joplin-token JOPLIN_TOKEN
            [--joplin-host JOPLIN_HOST] [--joplin-port JOPLIN_PORT]
-           [--location LOCATION] [--location-children] [--all]
+           [--location LOCATION] [--location-children] [--all][--log-level]
 
 Migrate from WizNote to Joplin.
 
@@ -86,16 +96,18 @@ optional arguments:
                         Use with --location parameter, convert all children
                         location of --location.
   --all, -a             Convert all documents of your WizNote.
+  --log-level           Use with --log-level to set the log level, default is INFO,
+                        other choice are "CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG".
 ```
 
 ## Log file
 
 Please read log file `w2j.log` under --output directory to check the conversion states.
 
-## 源码分析相关文章
+## Source code analysis related articles
 
-- [从 WizNote 为知笔记到 Joplin（上）](https://blog.zengrong.net/post/wiznote2joplin1/)
-- [从 WizNote 为知笔记到 Joplin（下）](https://blog.zengrong.net/post/wiznote2joplin2/)
-- [WizNote 为知笔记 macOS 本地文件夹分析](https://blog.zengrong.net/post/analysis-of-wiznote/)
-- [使用腾讯云对象存储(COS)实现Joplin同步](https://blog.zengrong.net/post/joplin-sync-use-cos/)
-- [配置 Joplin Server 实现同步](https://blog.zengrong.net/post/joplin-server-config/)
+- [from WizNote to the notes of Joplin（1）](https://blog.zengrong.net/post/wiznote2joplin1/)
+- [from WizNote to the notes of Joplin（2）](https://blog.zengrong.net/post/wiznote2joplin2/)
+- [WizNote on macOS Local folder analysis](https://blog.zengrong.net/post/analysis-of-wiznote/)
+- [Use Tencent Cloud Object Storage (COS) to achieve Joplin synchronization](https://blog.zengrong.net/post/joplin-sync-use-cos/)
+- [configuration Joplin Server Achieve synchronization](https://blog.zengrong.net/post/joplin-server-config/)

@@ -9,14 +9,15 @@ import sys
 from pathlib import Path
 import argparse
 
-__autho__ = 'zrong'
-__version__ = '0.4'
+
+__autho__ = 'zrong, holo'
+__version__ = '0.5.1'
 
 work_dir = Path.cwd()
 logger = logging.Logger('w2j')
 log_file = work_dir.joinpath('w2j.log')
-log_handler = logging.FileHandler(log_file)
-log_handler.setFormatter(logging.Formatter('{asctime} - {funcName} - {message}', style='{'))
+log_handler = logging.FileHandler(log_file, encoding="utf-8")
+log_handler.setFormatter(logging.Formatter('{asctime} - {funcName} - {levelname} - {message}', style='{'))
 # logger.addHandler(logging.StreamHandler(sys.stderr))
 logger.addHandler(log_handler)
 
@@ -31,10 +32,15 @@ parser.add_argument('--joplin-port', '-p', type=int, metavar='JOPLIN_PORT', defa
 parser.add_argument('--location', '-l', type=str, metavar='LOCATION', help='Convert the location of WizNote, e.g. /My Notes/. If you use the --all parameter, then skip --location parameter.')
 parser.add_argument('--location-children', '-r', action='store_true', help='Use with --location parameter, convert all children location of --location.')
 parser.add_argument('--all', '-a', action='store_true', help='Convert all documents of your WizNote.')
+parser.add_argument('--log-level', type=str, metavar='LOG_LEVEL', default="INFO",
+                    choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+                    help="Use with --log-level to set the log level, default is warning")
 args = parser.parse_args()
 
-
-from . import wiz
+if sys.platform == "win32":
+    from . import wiz_win as wiz
+else:
+    from . import wiz_mac as wiz
 from . import joplin
 from . import adapter
 
@@ -52,10 +58,17 @@ def main() -> None:
     output_dir = Path(args.output).expanduser()
     if not output_dir.exists():
         output_dir.mkdir()
-    logger.removeHandler(log_file)
+    logger.removeHandler(log_handler)
     newlog_file = output_dir.joinpath('w2j.log')
     print(f'Please read [{newlog_file.resolve()}] to check the conversion states.')
-    logger.addHandler(logging.FileHandler(newlog_file))
+    # Set the corresponding log level
+    newlog_handler = logging.FileHandler(newlog_file, encoding="utf-8")
+    newlog_handler.setFormatter(logging.Formatter('{asctime} - {funcName} - {levelname} - {message}', style='{'))
+    newlog_handler.setLevel(args.log_level)
+    logger.addHandler(newlog_handler)
+
+    # logger.addHandler(logging.FileHandler(newlog_file))
+
     jda = joplin.JoplinDataAPI(
         host=args.joplin_host,
         port=args.joplin_port,

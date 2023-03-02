@@ -3,14 +3,17 @@
 #
 # 适配器，将解析后的为知笔记对象装备成 joplin 笔记对象
 ##############################
-
+import sys
 from pathlib import Path
 from typing import Optional, Union
 import json
 import sqlite3
 
 from w2j import logger, work_dir as default_work_dir
-from w2j.wiz import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
+if sys.platform == "win32":
+    from w2j.wiz_win import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
+else:
+    from w2j.wiz_mac import WizDocument, WizAttachment, WizImage, WizInternalLink, WizTag, WizStorage
 from w2j.joplin import JoplinNote, JoplinFolder, JoplinResource, JoplinTag, JoplinDataAPI
 from w2j.parser import tojoplinid, towizid, convert_joplin_body, JoplinInternalLink
 
@@ -69,7 +72,7 @@ class Location2Folder(object):
 
 
 class ConvertUtil():
-    """ 处理转换的中间过程
+    """ Intermediate process of processing conversion
     """
     # 转换过程中的专用数据库连接
     conn: sqlite3.Connection
@@ -88,16 +91,18 @@ class ConvertUtil():
                 level INTEGER NOT NULL,
                 PRIMARY KEY (location)
             );""",
-        # 处理过的文档会保存在这里，在这个表中能找到的文档说明已经转换成功了
+        # The processed documents will be saved here, and the documents that can be found in this table indicate that the conversion has been successful.
         'note': """CREATE TABLE note (
                 note_id TEXT not NULL,
                 title TEXT not NULL,
                 joplin_folder TEXT NOT NULL,
                 markup_language INTEGER NOT NULL,
                 wiz_location TEXT NOT NULL,
+                created_time INTEGER NULL,
+                updated_time INTEGER NULL,
                 PRIMARY KEY (note_id)
             );""",
-        # 处理过的资源保存在这里，包括 image 和 attachment 资源
+        # Processed resources are saved here, including image 和 attachment 资源
         'resource': """CREATE TABLE resource (
                 resource_id TEXT not NULL,
                 title TEXT NOT NULL,
@@ -106,7 +111,7 @@ class ConvertUtil():
                 resource_type INTEGER NOT NULL,
                 PRIMARY KEY (resource_id)
             );""",
-        # 保存为知笔记中的内链，也就是 resource 与 note 的关系，使用 文档 guid 和 连接目标 guid 同时作为主键。链接目标 guid 为 joplin 格式
+        # Saved as an internal chain in the knowledge note, that is, resource 与 note 的关系，使用 文档 guid 和 连接目标 guid 同时作为主键。链接目标 guid 为 joplin 格式
         'internal_link': """
             CREATE TABLE internal_link (
                 note_id TEXT not NULL,
@@ -156,14 +161,14 @@ class ConvertUtil():
         self.init_db()
 
     def init_db(self):
-        """ 创建数据库
+        """ Create database
         """
         self.conn = sqlite3.connect(self.db_file)
         test_table = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?;"
 
         for table in ('l2f', 'note', 'resource', 'internal_link', 'tag', 'note_tag'):
             table_exists = self.conn.execute(test_table, (table, )).fetchone()[0]
-            logger.info(f'表 {table} 是否存在: {table_exists}')
+            logger.info(f'table {table} Does it exist: {table_exists}')
             if not table_exists:
                 self.conn.executescript(self.CREATE_SQL[table])
 
@@ -207,9 +212,9 @@ class ConvertUtil():
         """
         sql = 'SELECT location, title, parent_location, level, id, parent_id FROM l2f;'
         l2f_items = self.conn.execute(sql).fetchall()
-        logger.info(f'在数据库 l2f 中找到 {len(l2f_items)} 条记录。')
+        logger.info(f'Found in database l2f {len(l2f_items)} records.')
 
-        # 用 location 作为唯一 key
+        # Use location as the only一 key
         self.l2f_cache = {}
         for l2f_item in l2f_items:
             self.l2f_cache[l2f_item[0]] = Location2Folder(*l2f_item)
@@ -233,7 +238,7 @@ class ConvertUtil():
         """
         sql = 'SELECT tag_id, title FROM note_tag WHERE note_id=?;'
         items = self.conn.execute(sql, (guid, )).fetchall()
-        logger.info(f'在数据库 note_tag 中找到 note {guid} 的 {len(items)} 条 tag 记录。')
+        logger.info(f'In the database note_tag Found in note {guid} of {len(items)} strip tag records.')
         tag_dict: dict[str, JoplinTag] = {}
         for item in items:
             tag_id = item[1]
@@ -253,7 +258,7 @@ class ConvertUtil():
     def get_internal_links(self, guid: str) -> dict[str, JoplinInternalLink]:
         sql = 'SELECT note_id, resource_id, title, link_type FROM internal_link WHERE note_id=?;'
         items = self.conn.execute(sql, (guid, )).fetchall()
-        logger.info(f'在数据库 internal_link 中找到 note {guid} 的 {len(items)} 条内链记录。')
+        logger.info(f'In the database internal_link found in note {guid} of {len(items)} internal chain records.')
         links = {}
         for item in items:
             # 优先从缓存中获取 jil 对象
@@ -278,7 +283,7 @@ class ConvertUtil():
         """
         sql = 'SELECT tag_id, title, created_time, updated_time FROM tag;'
         tag_items = self.conn.execute(sql).fetchall()
-        logger.info(f'在数据库 tag 中找到 {len(tag_items)} 条记录。')
+        logger.info(f'In the database tag found {len(tag_items)} records.')
         self.tags = {}
         for tag_item in tag_items:
             self.tags[tag_item[0]] = JoplinTag(*tag_item)
@@ -286,21 +291,21 @@ class ConvertUtil():
     def load_resources(self) -> None:
         sql = 'SELECT resource_id, title, filename, created_time, resource_type FROM resource;'
         items = self.conn.execute(sql).fetchall()
-        logger.info(f'在数据库 resource 中找到 {len(items)} 条记录。')
+        logger.info(f'In the database resource found {len(items)} records.')
         self.resources = {}
         for item in items:
             jr = JoplinResource(*item)
             self.resources[jr.id] = jr
 
     def load_notes(self) -> None:
-        """ 从数据库中载入已经同步的 note
+        """ Load the synchronized from the database note
         """
-        sql = 'SELECT note_id, title, joplin_folder, markup_language, wiz_location FROM note;'
+        sql = 'SELECT note_id, title, joplin_folder, markup_language, wiz_location, created_time, updated_time FROM note;'
         items = self.conn.execute(sql).fetchall()
-        logger.info(f'在数据库 note 中找到 {len(items)} 条记录。')
+        logger.info(f'In the database note found {len(items)} records.')
         self.notes = {}
         for item in items:
-            jn = JoplinNote(item[0], item[1], item[2], item[3], location=item[4])
+            jn = JoplinNote(item[0], item[1], item[2], item[3], location=item[4], created_time=item[5], updated_time=item[6])
             jn.folder = self.folders[jn.parent_id]
             jn.internal_links = self.get_internal_links(jn.id)
             jn.resources = self.get_resources(jn.internal_links)
@@ -310,7 +315,7 @@ class ConvertUtil():
     def load_internal_links(self) -> None:
         sql = 'SELECT note_id, resource_id, title, link_type FROM internal_link;'
         items = self.conn.execute(sql).fetchall()
-        logger.info(f'在数据库 internal_link 中找到 {len(items)} 条内链记录。')
+        logger.info(f'In the database internal_link found {len(items)} internal chain records.')
         self.internal_links = {}
         for item in items:
             jil: JoplinInternalLink = JoplinInternalLink(*item)
@@ -320,7 +325,7 @@ class ConvertUtil():
         """ 向数据库中加入一个没有创建过的 tag
         """
         if self.tags.get(tag.id) is not None:
-            logger.warning(f'tag {tag.id} |{tag.title}| 已经存在，不需要新增。')
+            logger.warning(f'tag {tag.id} |{tag.title}| already exists and does not need to be added.')
             return
         sql = 'INSERT INTO tag (tag_id, title, created_time, updated_time) VALUES (?, ?, ?, ?);'
         self.conn.execute(sql, (tag.id, tag.title, tag.created_time, tag.updated_time))
@@ -331,7 +336,7 @@ class ConvertUtil():
         """ 向数据库中加入一个没有创建过的 resource
         """
         if self.resources.get(jr.id) is not None:
-            logger.warning(f'resource {jr.id} |{jr.title}| 已经存在，不需要新增。')
+            logger.warning(f'resource {jr.id} |{jr.title}| already exists and does not need to be added.')
             return
         sql = 'INSERT INTO resource (resource_id, title, filename, created_time, resource_type) VALUES (?, ?, ?, ?, ?);'
         self.conn.execute(sql, (jr.id, jr.title, jr.filename, jr.created_time, jr.resource_type))
@@ -340,7 +345,7 @@ class ConvertUtil():
 
     def add_internal_lnk(self, jil: JoplinInternalLink) -> None:
         if self.internal_links.get(jil.id) is not None:
-            logger.warning(f'internal_link {jil.id} |{jil.title}-{jil.link_type}| 已经在数据库中存在，不需要新增。')
+            logger.warning(f'internal_link {jil.id} |{jil.title}-{jil.link_type}| already exists in the database and does not need to be added.')
             return
         sql = 'INSERT INTO internal_link (note_id, resource_id, title, link_type) VALUES (?, ?, ?, ?);'
         self.conn.execute(sql, (jil.note_id, jil.resource_id, jil.title, jil.link_type))
@@ -348,12 +353,12 @@ class ConvertUtil():
         self.conn.commit()
 
     def add_note_tag(self, note: JoplinNote, tag: JoplinTag) -> None:
-        """ 增加一个 note 的 tag
+        """ Add one note tag
         """
         test_note_tag = "SELECT count(*) FROM note_tag WHERE note_id=? AND tag_id=?;"
         note_tag_item = self.conn.execute(test_note_tag, (note.id, tag.id)).fetchone()
         if note_tag_item:
-            logger.warning(f'note {note.id}|{note.title}| 的 tag {tag.id}|{tag.title}| 已经存在！')
+            logger.warning(f'note {note.id}|{note.title}| of tag {tag.id}|{tag.title}| already exists！')
             return
         sql = 'INSERT INTO note_tag (note_id, tag_id, title, created_time) VALUES (?, ?, ?, ?);'
         self.conn.execute(sql, (note.id, tag.id, tag.title, tag.created_time))
@@ -361,10 +366,10 @@ class ConvertUtil():
 
     def add_note(self, note: JoplinNote) -> None:
         if self.notes.get(note.id) is not None:
-            logger.warning(f'note {note.id} |{note.title}| 已经在数据库中存在，不需要新增。')
+            logger.warning(f'note {note.id} |{note.title}| already exists in the database and does not need to be added.')
             return
-        sql = 'INSERT INTO note (note_id, title, joplin_folder, markup_language, wiz_location) VALUES (?, ?, ?, ?, ?);'
-        self.conn.execute(sql, (note.id, note.title, note.parent_id, note.markup_language, note.location))
+        sql = 'INSERT INTO note (note_id, title, joplin_folder, markup_language, wiz_location, created_time, updated_time) VALUES (?, ?, ?, ?, ?, ?, ?);'
+        self.conn.execute(sql, (note.id, note.title, note.parent_id, note.markup_language, note.location, note.created_time, note.updated_time))
         self.conn.commit()
 
         self.notes[note.id] = note
@@ -374,7 +379,7 @@ class ConvertUtil():
             self.add_internal_lnk(jil)
 
     def update_l2f(self, location: str, id: str, parent_id: Optional[str] = None):
-        """ 更新 Folder 的 guid 到 l2f 对象中
+        """ update Folder 的 guid 到 l2f 对象中
         每次更新都写入 db
         """
         l2f_inst = self.l2f_cache[location]
@@ -409,53 +414,53 @@ class Adapter(object):
         self.jda = jda
         self.work_dir = work_dir or default_work_dir
 
-        # 解析所有的文档
+        # Parse all documents
         self.ws.resolve()
 
-        # 从数据库载入缓存
+        # Load cache from database
         self.cu = ConvertUtil(self.work_dir.joinpath('w2j.sqlite'))
         self.cu.init_cache(self.ws.documents)
 
     def sync_folders(self) -> None:
-        """ 同步为知笔记的目录 到 Joplin Folder
-        在为知笔记中，目录不是一种资源，它直接在配置文件中定义，在数据库中仅作为 location 字段存在
-        而在 Joplin 中，目录是一种标准资源 https://joplinapp.org/api/references/rest_api/#item-type-ids
+        """ Synchronize the directory of WizNote to Joplin Folder
+        In WizNote, the directory is not a resource, it is directly defined in the configuration file, and it is only used as a resource in the database. location Field exists
+        and in Joplin the directory is a standard resource https://joplinapp.org/api/references/rest_api/#item-type-ids
         """
         waiting_created_l2f = self.cu.get_waiting_for_created_l2f()
-        logger.info(f'有 {len(waiting_created_l2f)} 个 folder 等待同步。')
+        logger.info(f'have {len(waiting_created_l2f)} a folder wait for synchronization.')
         for l2f in waiting_created_l2f:
             jf = None
-            logger.info(f'处理 location {l2f.location}')
-            # level1 没有父对象
+            logger.info(f'Deal with location {l2f.location}')
+            # level1 (No parent object)
             if l2f.parent_location is None:
                 jf = self.jda.post_folder(title=l2f.title)
                 self.cu.update_l2f(l2f.location, jf.id)
             else:
                 parent_l2f: Location2Folder = self.cu.l2f_cache.get(l2f.parent_location)
                 if parent_l2f is None:
-                    msg = f'找不到父对象 {l2f.parent_location}！'
+                    msg = f'Parent object not found {l2f.parent_location}！'
                     logger.error(msg)
                     raise ValueError(msg)
                 if parent_l2f.id is None:
-                    msg = f'父对象 {l2f.parent_location} 没有 id！'
+                    msg = f'Parent object {l2f.parent_location} no id！'
                     logger.error(msg)
                     raise ValueError(msg)
                 jf = self.jda.post_folder(title=l2f.title, parent_id=parent_l2f.id)
                 self.cu.update_l2f(l2f.location, jf.id, jf.parent_id)
-        # 更新了 l2f_cache 之后，要更新一次 folders
+        # updated l2f_cache after that, update it once folders
         self.cu.load_folders()
 
     def sync_tags(self) -> None:
-        """ 同步为知笔记的 tag 到 Joplin Tag
+        """ Synchronization of notes for knowledge tag to Joplin Tag
         """
         created_keys = self.cu.tags.keys()
         waiting_create_tags = [wt for wt in self.ws.tags if not tojoplinid(wt.guid) in created_keys]
-        logger.info(f'为知笔记共有 {len(self.ws.tags)} 个 tag 。')
-        logger.info(f'有 {len(waiting_create_tags)} 个 tag 等待同步。')
+        logger.info(f'Total number of notes tags: {len(self.ws.tags)}')
+        logger.info(f'have {len(waiting_create_tags)} tag wait for synchronization.')
         for wt in waiting_create_tags:
             tag_id = tojoplinid(wt.guid)
             try:
-                logger.info(f'处理 tag {wt.name} {tag_id}')
+                logger.info(f'Deal with tag {wt.name} {tag_id}')
                 jt = self.jda.post_tag(id=tag_id, title=wt.name, created_time=wt.modified, updated_time=wt.modified)
                 self.cu.add_tag(jt)
             except ValueError as e:
@@ -467,13 +472,13 @@ class Adapter(object):
                 continue
 
     def _upload_wiz_attachment(self, attach: WizAttachment) -> JoplinResource:
-        """ 上传一个未知附件
+        """ Upload an unknown attachment
         """
         resource_id = tojoplinid(attach.guid)
         jr: JoplinResource = self.cu.resources.get(resource_id)
         if jr is not None:
-            logger.warning(f'resource {resource_id} |{jr.title}|已经存在！')
-            return
+            logger.warning(f'resource {resource_id} |{jr.title}| already exists!')
+            return jr
         jr = self.jda.post_resource(
             attach.file,
             1,
@@ -487,7 +492,7 @@ class Adapter(object):
         return jr
 
     def _upload_wiz_image(self, image: WizImage) -> JoplinResource:
-        """ 上传一个为知图像
+        """ Upload a known image
         """
         jr: JoplinResource = self.jda.post_resource(
             image.file,
@@ -499,13 +504,13 @@ class Adapter(object):
         return jr
 
     def _sync_note(self, document: WizDocument) -> JoplinNote:
-        """ 同步一篇笔记
+        """ Sync a note
         """
-        logger.info(f'正在处理 document {document.guid}|{document.title}|。')
+        logger.info(f'Processing document {document.guid}|{document.title}|。')
         note_id = tojoplinid(document.guid)
         jn: JoplinNote = self.cu.get_note(note_id)
         if jn is not None:
-            logger.warning(f'note {jn.id} |{jn.title}| 已经存在！')
+            logger.warning(f'note {jn.id} |{jn.title}| already exists！')
             return
 
         # 临时保存上传成功后生成的 Image 和 Attachment 对应的 Joplin Resource
@@ -523,16 +528,17 @@ class Adapter(object):
 
         # 上传附件
         for attachment in document.attachments:
+            # 不是知道这个":"用法,是不是良好习惯，一直以为只能用在func定义返回类型
             jr: JoplinResource = self._upload_wiz_attachment(attachment)
             resources_in_note[jr.id] = jr
 
             jil_id = f'{note_id}-{jr.id}'
             jil: JoplinInternalLink = joplin_internal_links.get(jil_id)
             if jil is not None:
-                logger.warning(f'内链关系 {jil_id} 已存在！')
+                logger.warning(f'Internal link {jil_id} already exists！')
                 continue
 
-            # 这个附件在附件列表中存在，但是在 body 中不存在，此时没有 outerhtml，需要在转换时将这个附件添加到 body 末尾
+            # This attachment exists in the attachment list, but in body Does not exist, not at this time outerhtml，You need to add this attachment to when converting body end
             jil: JoplinInternalLink = JoplinInternalLink(note_id, jr.id, jr.title, 'open_attachment')
             joplin_internal_links[jil.id] = jil
 
@@ -551,7 +557,7 @@ class Adapter(object):
            )
 
         folder = self.cu.get_folder(location=document.location)
-        note: JoplinNote = self.jda.post_note(note_id, document.title, body, document.is_markdown, folder.id, document.url)
+        note: JoplinNote = self.jda.post_note(note_id, document.title, body, document.is_markdown, folder.id, document.url, document.created, document.modified)
         note.internal_links = joplin_internal_links
         note.folder = folder
         note.tags = self.cu.get_tags(note.id)
@@ -560,11 +566,11 @@ class Adapter(object):
         return note
         
     def _get_locations(self, location: str, locations: list[str]) -> None:
-        """ 获取一个 location 下的所有 location
+        """ Get one location from all location
         """
         cur_l2f = self.cu.l2f_cache.get(location)
         if cur_l2f is None:
-            raise ValueError(f'找不到 {location}')
+            raise ValueError(f'Can not find {location}')
         for l2f in self.cu.l2f_cache.values():
             if l2f.parent_location and l2f.level > cur_l2f.level and l2f.parent_location == location:
                 # print(f'{cur_l2f.level} {l2f.level} {self.cu.folder_max_level} {l2f.parent_location} {l2f.location} {location}')
@@ -572,24 +578,24 @@ class Adapter(object):
                 self._get_locations(l2f.location, locations)
 
     def sync_note_by_location(self, location: str, with_children: bool=True) -> None:
-        """ 同步指定为知笔记目录中所有的笔记
+        """ Synchronize all notes in the directory
         """
         self.sync_folders()
         self.sync_tags()
         locations = [location]
         if with_children:
             self._get_locations(location, locations)
-        logger.info(f'处理以下 location： {locations}')
+        logger.info(f'Deal with the following location： {locations}')
         waiting_for_sync = [wd for wd in self.ws.documents if wd.location in locations]
-        logger.info(f'为知笔记目录 {location} 中有 {len(waiting_for_sync)} 篇笔记等待同步。')
+        logger.info(f'List of Notes for Knowledge {location} Among them are {len(waiting_for_sync)} the notes are waiting to be synchronized.')
         for wd in waiting_for_sync:
             self._sync_note(wd)
 
     def sync_all(self) -> None:
-        """ 同步所有内容
+        """ Sync all content
         """
         self.sync_folders()
         self.sync_tags()
-        logger.info(f'为知笔记转换所有文档 {len(self.ws.documents)} 篇。')
+        logger.info(f'Convert all documents for knowing notes {len(self.ws.documents)} article.')
         for wd in self.ws.documents:
             self._sync_note(wd)
