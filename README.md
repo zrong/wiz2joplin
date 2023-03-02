@@ -3,18 +3,20 @@ Migrate from WizNote to Joplin.
 ## !!!CAUTION!!!!
 
 wiz2joplin 0.5 has only been tested in wizNote for Win with wiznote ver4.13.25, not test in wiznoteX.
-the folder structure of the macOS and Windows versions of wizNote is different, but maybe this version is also compatible for mac.
+
+The folder structure of the macOS and Windows versions of wizNote is different, but maybe this version is also compatible for mac.
+
 All log messages and error messages translate to english only for windows wersion.
+
 This version migrate DateCreated and DateModified of notes.
+
 Struct of folder on Win:
-<some path> example D:\
-  wiz2joplin
-    wiz
-      user@mail.com - Fully copied data directory (ex: C:\Users\user\Documents\My Knowledge\Data\user@mail.com
-  out - empty folder
-  w2j - updated script files (from this fork)
-
-
+\<some path> example D:\
+ - wiz2joplin
+   - wiz
+      - user@mail.com - Fully copied data directory (ex: C:\Users\user\Documents\My Knowledge\Data\user@mail.com
+    - out - empty folder
+    - w2j - updated script files (from this fork)
 
 ## Dependency
 
