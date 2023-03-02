@@ -11,13 +11,14 @@ All log messages and error messages translate to english only for windows wersio
 This version migrate DateCreated and DateModified of notes.
 
 Struct of folder on Win:
-\<some path> example D:\
- - wiz2joplin
-   - wiz
-      - user@mail.com - Fully copied data directory (ex: C:\Users\user\Documents\My Knowledge\Data\user@mail.com
-    - out - empty folder
-    - w2j - updated script files (from this fork)
-
+```
+<some path> example D:
+  wiz2joplin
+    wiz
+      user@mail.com - Fully copied data directory (ex: C:\Users\user\Documents\My Knowledge\Data\user@mail.com
+    out - empty folder
+    w2j - updated script files (from this fork)
+```
 ## Dependency
 
 - Python 3.9
@@ -58,6 +59,7 @@ python __main__.py -o D:\w2j\out -w D:\w2j\wiz -u user@mail.ru -t df9785823ce435
 
 Use `w2j --help` to show usage for w2j:
 
+```
 ```
 usage: w2j [-h] --output OUTPUT --wiz-dir WIZNOTE_DIR --wiz-user
            WIZNOTE_USER_ID --joplin-token JOPLIN_TOKEN
@@ -102,10 +104,10 @@ optional arguments:
 
 Please read log file `w2j.log` under --output directory to check the conversion states.
 
-## 源码分析相关文章
+## Source code analysis related articles
 
-- [从 WizNote 为知笔记到 Joplin（上）](https://blog.zengrong.net/post/wiznote2joplin1/)
-- [从 WizNote 为知笔记到 Joplin（下）](https://blog.zengrong.net/post/wiznote2joplin2/)
-- [WizNote 为知笔记 macOS 本地文件夹分析](https://blog.zengrong.net/post/analysis-of-wiznote/)
-- [使用腾讯云对象存储(COS)实现Joplin同步](https://blog.zengrong.net/post/joplin-sync-use-cos/)
-- [配置 Joplin Server 实现同步](https://blog.zengrong.net/post/joplin-server-config/)
+- [from WizNote to the notes of Joplin（1）](https://blog.zengrong.net/post/wiznote2joplin1/)
+- [from WizNote to the notes of Joplin（2）](https://blog.zengrong.net/post/wiznote2joplin2/)
+- [WizNote on macOS Local folder analysis](https://blog.zengrong.net/post/analysis-of-wiznote/)
+- [Use Tencent Cloud Object Storage (COS) to achieve Joplin synchronization](https://blog.zengrong.net/post/joplin-sync-use-cos/)
+- [configuration Joplin Server Achieve synchronization](https://blog.zengrong.net/post/joplin-server-config/)
